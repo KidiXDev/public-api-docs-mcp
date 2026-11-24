@@ -1,6 +1,6 @@
-# Hoppscotch Public Docs MCP
+# Public API Docs MCP
 
-A read-only MCP server for [published Hoppscotch API documentation](https://docs.hoppscotch.io/documentation/features/documentation). Search requests, inspect endpoint details, and read saved response examples. It uses Hoppscotch's public documentation endpoint; no Hoppscotch account or token is required.
+A read-only MCP server for API documentation published with [Hoppscotch](https://docs.hoppscotch.io/documentation/features/documentation) or [Postman](https://learning.postman.com/docs/publishing-your-api/publishing-your-docs/). Search requests, inspect endpoint details, and read saved response examples. It uses each provider's public documentation endpoint; no account or token is required.
 
 ## Installation
 
@@ -11,14 +11,14 @@ Copy one of these prompts and paste it into your MCP-capable AI agent.
 #### Using uv
 
 ```text
-Install the Hoppscotch Public Docs MCP server for this AI client from https://github.com/KidiXDev/hoppscotch-public-docs-mcp.
+Install the Public API Docs MCP server for this AI client from https://github.com/KidiXDev/public-api-docs-mcp.
 
 Follow the repository README and install it using uv. Install uv first if needed.
 
 Configure this client to run:
-hoppscotch-public-docs-mcp
+public-api-docs-mcp
 
-Do not set a default Hoppscotch document URL. I will give you a published URL for each project; pass it as doc_url on every tool call.
+Do not set a default document URL. I will give you a published URL for each project; pass it as doc_url on every tool call.
 
 Verify that the server exposes get_document, search_documentation, list_endpoints, and get_endpoint.
 
@@ -28,15 +28,15 @@ Tell me what you configured and whether I need to restart the client.
 #### Using Docker
 
 ```text
-Install the Hoppscotch Public Docs MCP server for this AI client from https://github.com/KidiXDev/hoppscotch-public-docs-mcp.
+Install the Public API Docs MCP server for this AI client from https://github.com/KidiXDev/public-api-docs-mcp.
 
 Use the prebuilt Docker image:
-ghcr.io/kidixdev/hoppscotch-public-docs-mcp:latest
+ghcr.io/kidixdev/public-api-docs-mcp:latest
 
 Configure this client to run the MCP server over stdio using:
-docker run --rm -i ghcr.io/kidixdev/hoppscotch-public-docs-mcp:latest
+docker run --rm -i ghcr.io/kidixdev/public-api-docs-mcp:latest
 
-Do not set a default Hoppscotch document URL. I will give you a published URL for each project; pass it as doc_url on every tool call.
+Do not set a default document URL. I will give you a published URL for each project; pass it as doc_url on every tool call.
 
 Verify that the server exposes get_document, search_documentation, list_endpoints, and get_endpoint.
 
@@ -52,7 +52,7 @@ Requires Python 3.10+ and [uv](https://docs.astral.sh/uv/getting-started/install
 Install directly from GitHub:
 
 ```bash
-uv tool install git+https://github.com/KidiXDev/hoppscotch-public-docs-mcp.git
+uv tool install git+https://github.com/KidiXDev/public-api-docs-mcp.git
 ```
 
 Or install from a checkout:
@@ -66,7 +66,7 @@ Then [configure your MCP client](#manual-mcp-client-setup).
 To check a published document:
 
 ```bash
-hoppscotch-public-docs-mcp --check https://api-docs.hoppscotch.io/view/YOUR_DOC_ID
+public-api-docs-mcp --check https://api-docs.hoppscotch.io/view/YOUR_DOC_ID
 ```
 
 If the command is not found after installation, run `uv tool update-shell`, reopen your terminal, or use the executable's absolute path in your MCP client.
@@ -76,28 +76,33 @@ If the command is not found after installation, run `uv tool update-shell`, reop
 Pull the prebuilt image:
 
 ```bash
-docker pull ghcr.io/kidixdev/hoppscotch-public-docs-mcp:latest
+docker pull ghcr.io/kidixdev/public-api-docs-mcp:latest
 ```
 
 Check a published document:
 
 ```bash
 docker run --rm \
-  ghcr.io/kidixdev/hoppscotch-public-docs-mcp:latest \
+  ghcr.io/kidixdev/public-api-docs-mcp:latest \
   --check https://api-docs.hoppscotch.io/view/YOUR_DOC_ID
 ```
 
 For an MCP client's stdio configuration, use:
 
 ```bash
-docker run --rm -i ghcr.io/kidixdev/hoppscotch-public-docs-mcp:latest
+docker run --rm -i ghcr.io/kidixdev/public-api-docs-mcp:latest
 ```
 
 Keep `-i` and do not detach the container.
 
 ## Choose a document per call
 
-Start the server without a document URL. Pass the project's published `/view/<slug>` URL as `doc_url` on each tool call, optionally ending in a version.
+Start the server without a document URL. Pass the project's published link as `doc_url` on each tool call:
+
+| Provider | Link |
+| --- | --- |
+| Hoppscotch | `https://api-docs.hoppscotch.io/view/<slug>[/<version>]` |
+| Postman | `https://documenter.getpostman.com/view/<owner>/<id>`, optionally with `?version=<tag>` or a `#<request-id>` deep link |
 
 For example:
 
@@ -110,9 +115,9 @@ search_documentation(
 
 Include the relevant URL in your request to the agent so it can pass the right URL for each project.
 
-Without a document URL, a tool call returns an error.
+Without a document URL, a tool call returns an error. Postman custom domains, private workspaces, and `postman.com` workspace links are not supported.
 
-For compatible self-hosted deployments, these optional settings change where the server reads published docs:
+For compatible self-hosted Hoppscotch deployments, these optional settings change where the server reads published docs:
 
 | Variable                  | Purpose                                                 | Default                          |
 | ------------------------- | ------------------------------------------------------- | -------------------------------- |
@@ -121,16 +126,26 @@ For compatible self-hosted deployments, these optional settings change where the
 
 For a self-hosted deployment using the same `/v1/published-docs` route, set both values to that deployment's viewer origin and backend `/v1` URL.
 
-Per-call `doc_url` values must match the configured viewer origin.
+Per-call Hoppscotch `doc_url` values must match the configured viewer origin. Postman links are unaffected.
 
 ## MCP tools
 
-| Tool                                                          | What it returns                                                                       |
-| ------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `get_document(doc_url="")`                                    | Title, version, folder names, environment variable names, and endpoint count          |
-| `search_documentation(query, doc_url="", offset=0, limit=10)` | Ranked, short endpoint summaries for API concepts in a task; up to 50 per page        |
-| `list_endpoints(query="", doc_url="", offset=0, limit=50)`    | Exact text matches by folder, name, method, URL, or description; up to 100 per page   |
-| `get_endpoint(request_id, doc_url="", response_name="")`      | Request details and available response names; the named saved response when requested |
+| Tool | What it returns |
+| --- | --- |
+| `search_documentation(query, doc_url="", offset=0, limit=10)` | Ranked, short endpoint summaries for an API concept; up to 50 per page |
+| `get_endpoint(request_id, doc_url="", response_name="", full_bodies=False)` | One endpoint's request details, its saved responses, and one example response |
+| `get_document(doc_url="")` | Title, versions, description, folder paths with endpoint counts, variable names, and endpoint count |
+| `list_endpoints(folder="", method="", query="", doc_url="", offset=0, limit=50)` | Endpoints in document order, filtered by folder, method, or exact text; up to 100 per page |
+
+The server sends this workflow to the agent as MCP instructions:
+
+1. Search one concept at a time (`product`, then `tenant`) with `search_documentation`. Search uses keyword ranking, not semantic understanding. To cover a whole API, use `get_document`, then `list_endpoints` by folder.
+2. Call `get_endpoint` for the routes the task needs. It includes the first 2xx example response.
+3. Call it again with a `response_name` for other cases, such as errors.
+
+Search and list results include `total` and `next_offset` for paging. `get_endpoint` shortens strings over 300 characters and arrays over three items in bodies, keeps the JSON structure, and reports `body_truncated` and `response.truncated`. Pass `full_bodies=true` for the uncut content. Fetched documents are cached for up to a minute.
+
+The server omits saved auth and variable values and redacts credential-like header and parameter values. Descriptions and request and response bodies are otherwise returned as published, so review the source document before sharing its contents.
 
 ## Manual MCP client setup
 
@@ -151,7 +166,7 @@ If you use Docker, replace the executable with:
     "run",
     "--rm",
     "-i",
-    "ghcr.io/kidixdev/hoppscotch-public-docs-mcp:latest"
+    "ghcr.io/kidixdev/public-api-docs-mcp:latest"
   ]
 }
 ```
@@ -161,8 +176,8 @@ If you use Docker, replace the executable with:
 Add this to `~/.codex/config.toml` or a project `.codex/config.toml`:
 
 ```toml
-[mcp_servers.hoppscotch_docs]
-command = "hoppscotch-public-docs-mcp"
+[mcp_servers.api_docs]
+command = "public-api-docs-mcp"
 ```
 
 Run:
@@ -176,8 +191,8 @@ See the [Codex MCP guide](https://developers.openai.com/codex/mcp).
 ### Claude Code
 
 ```bash
-claude mcp add --scope user --transport stdio hoppscotch-docs -- hoppscotch-public-docs-mcp
-claude mcp get hoppscotch-docs
+claude mcp add --scope user --transport stdio api-docs -- public-api-docs-mcp
+claude mcp get api-docs
 ```
 
 See the [Claude Code MCP guide](https://code.claude.com/docs/en/mcp).
@@ -187,8 +202,8 @@ For **Claude Desktop**, edit `~/Library/Application Support/Claude/claude_deskto
 ```json
 {
   "mcpServers": {
-    "hoppscotch-docs": {
-      "command": "hoppscotch-public-docs-mcp"
+    "api-docs": {
+      "command": "public-api-docs-mcp"
     }
   }
 }
@@ -211,8 +226,8 @@ In Antigravity CLI, edit `~/.gemini/config/mcp_config.json` or `.agents/mcp_conf
 ```json
 {
   "mcpServers": {
-    "hoppscotch-docs": {
-      "command": "hoppscotch-public-docs-mcp"
+    "api-docs": {
+      "command": "public-api-docs-mcp"
     }
   }
 }
@@ -227,9 +242,9 @@ For Copilot in VS Code, create `.vscode/mcp.json` in your project or use **MCP: 
 ```json
 {
   "servers": {
-    "hoppscotch-docs": {
+    "api-docs": {
       "type": "stdio",
-      "command": "hoppscotch-public-docs-mcp"
+      "command": "public-api-docs-mcp"
     }
   }
 }
@@ -240,8 +255,8 @@ Use Copilot Chat **Agent** mode and enable the server in its tools picker.
 For Copilot CLI:
 
 ```bash
-copilot mcp add hoppscotch-docs -- hoppscotch-public-docs-mcp
-copilot mcp get hoppscotch-docs
+copilot mcp add api-docs -- public-api-docs-mcp
+copilot mcp get api-docs
 ```
 
 The CLI also accepts a portable `~/.copilot/mcp-config.json` with a top-level `mcpServers` object. VS Code's `.vscode/mcp.json` uses `servers`.
@@ -255,7 +270,7 @@ To run an HTTP server locally with Docker:
 ```bash
 docker run --rm \
   -p 127.0.0.1:8000:8000 \
-  ghcr.io/kidixdev/hoppscotch-public-docs-mcp:latest \
+  ghcr.io/kidixdev/public-api-docs-mcp:latest \
   --http \
   --host 0.0.0.0
 ```
@@ -271,20 +286,20 @@ Pass `doc_url` to each tool call.
 For a local Python process:
 
 ```bash
-hoppscotch-public-docs-mcp --http
+public-api-docs-mcp --http
 ```
 
 ## Develop
 
 ```bash
 uv run python -m unittest -v
-uv run hoppscotch-public-docs-mcp --check https://api-docs.hoppscotch.io/view/YOUR_DOC_ID
+uv run public-api-docs-mcp --check https://api-docs.hoppscotch.io/view/YOUR_DOC_ID
 ```
 
 Build the Docker image locally:
 
 ```bash
-docker build -t hoppscotch-public-docs-mcp .
+docker build -t public-api-docs-mcp .
 ```
 
 ## License

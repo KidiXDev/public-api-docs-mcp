@@ -1,7 +1,9 @@
+import io
+import json
 import unittest
 from unittest.mock import patch
 
-from hoppscotch_public_docs_mcp import server
+from public_api_docs_mcp import server
 
 
 DOC = {"title": "Example", "version": "CURRENT", "url": "https://api-docs.hoppscotch.io/view/abc/CURRENT",
@@ -37,13 +39,17 @@ class ServerTest(unittest.TestCase):
             overview = server.get_document()
             self.assertEqual(overview["endpoint_count"], 1)
             self.assertEqual(overview["variables"], ["BASE_URL"])
-            found = server.list_endpoints("create")
+            self.assertEqual(overview["folders"], [{"path": "Users", "endpoint_count": 1}])
+            self.assertEqual(server.list_endpoints(folder="User")["total"], 0)
+            self.assertEqual(server.list_endpoints(method="get")["total"], 0)
+            found = server.list_endpoints(folder="users", method="post", query="create")
             self.assertEqual(found["endpoints"][0]["id"], "req1")
             detail = server.get_endpoint("req1", response_name="Created")
             self.assertEqual(detail["folder"], "Users")
             self.assertEqual(detail["params"][0]["value"], "[redacted]")
             self.assertEqual(detail["response"]["code"], 201)
             self.assertNotIn("do-not-return", str(detail))
+            self.assertEqual(server.get_endpoint("req1")["response"]["code"], 201)
             with self.assertRaises(server.ToolError):
                 server.get_endpoint("req1", response_name="Missing")
 
@@ -67,10 +73,64 @@ class ServerTest(unittest.TestCase):
             self.assertNotIn("sensitive sample", str(result))
             self.assertEqual(server.search_documentation("tenant", offset=2)["endpoints"][0]["id"],
                              "account")
+            self.assertEqual(server.search_documentation("accounts")["total"], 1)
+            self.assertEqual(server.search_documentation("get data")["total"], 4)
             with self.assertRaises(server.ToolError):
-                server.search_documentation("make a page")
+                server.search_documentation("!")
             with self.assertRaises(server.ToolError):
                 server.search_documentation("tenant", limit=51)
+
+    def test_postman(self):
+        api = server._api_url("https://documenter.getpostman.com/view/123/abc?version=2.0#some-id")
+        self.assertEqual(
+            api, "https://documenter.gw.postman.com/api/collections/123/abc?segregateAuth=true&versionTag=2.0")
+        for bad in ("http://documenter.getpostman.com/view/123/abc",
+                    "https://documenter.getpostman.com/view/123/..",
+                    "https://documenter.getpostman.com/view/123/abc?version=../x",
+                    "https://documenter.getpostman.com.evil.test/view/123/abc"):
+            with self.assertRaises(server.ToolError):
+                server._api_url(bad)
+        big = json.dumps({"data": [{"id": n, "image": "x" * 9000} for n in range(9)]})
+        response = {"name": "OK", "status": "OK", "code": 200, "body": big}
+        data = {
+            "info": {"name": "Shop", "description": "<html><body><p>Sell &amp; buy</p></body></html>"},
+            "variable": [{"key": "BASE_URL", "value": "hidden"}],
+            "item": [{"name": "Auth", "item": [{"name": "Nested", "item": [{
+                "id": "login", "name": "Login",
+                "request": {
+                    "method": "POST", "url": "{{BASE_URL}}/login/:shop?token=do-not-return",
+                    "description": "<p>Use <code>email</code></p>\n",
+                    "auth": {"type": "bearer", "bearer": {"basicConfig": [{"value": "do-not-return"}]}},
+                    "header": [{"key": "X-Api-Key", "value": "do-not-return"}],
+                    "urlObject": {"variable": [{"key": "shop", "value": "1", "description": {"content": "<p>Shop id</p>"}}], "query": [
+                        {"key": "token", "value": "do-not-return", "disabled": True}]},
+                    "body": {"mode": "raw", "raw": '{"email": "a"}'}},
+                "response": [{**response, "name": "Bad", "code": 400, "body": "no"}, response, response],
+            }]}]}],
+        }
+        with patch.object(server, "urlopen", return_value=io.BytesIO(json.dumps(data).encode())):
+            server._fetch.cache_clear()
+            url = "https://documenter.getpostman.com/view/123/abc"
+            overview = server.get_document(url)
+            self.assertEqual(overview["description"], "Sell & buy")
+            self.assertEqual(overview["folders"], [{"path": "Auth/Nested", "endpoint_count": 1}])
+            self.assertEqual(overview["variables"], ["BASE_URL"])
+            detail = server.get_endpoint("login", doc_url=url)
+            self.assertNotIn("do-not-return", str(detail))
+            self.assertEqual(detail["endpoint"], "{{BASE_URL}}/login/:shop")
+            self.assertEqual(detail["description"], "Use email")
+            self.assertEqual(detail["auth_type"], "bearer")
+            self.assertEqual(detail["params"][0]["description"], "Shop id")
+            self.assertEqual([row["type"] for row in detail["params"]], ["path", "query"])
+            self.assertEqual(detail["body"], {"contentType": "raw", "body": '{"email": "a"}'})
+            self.assertFalse(detail["body_truncated"])
+            self.assertEqual([r["name"] for r in detail["responses"]], ["Bad", "OK", "OK (2)"])
+            self.assertEqual(detail["response"]["name"], "OK")
+            self.assertTrue(detail["response"]["truncated"])
+            self.assertLess(len(detail["response"]["body"]), 2000)
+            self.assertIn("6 more items", json.loads(detail["response"]["body"])["data"][-1])
+            full = server.get_endpoint("login", doc_url=url, full_bodies=True)
+            self.assertEqual(full["response"]["body"], big)
 
 
 if __name__ == "__main__":
